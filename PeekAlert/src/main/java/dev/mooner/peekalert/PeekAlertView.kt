@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
 import android.view.*
+import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.LinearLayout
 import androidx.annotation.ColorInt
@@ -191,7 +192,7 @@ class PeekAlertView(
 
     init {
         binding = LayoutAlertBinding.inflate(LayoutInflater.from(context), this, true)
-        layoutParams = LayoutParams(width, WRAP_CONTENT)
+        layoutParams = LayoutParams(MATCH_PARENT, WRAP_CONTENT)
         if (width != WRAP_CONTENT) {
             binding.cardBackground.updateLayoutParams {
                 this.width = width

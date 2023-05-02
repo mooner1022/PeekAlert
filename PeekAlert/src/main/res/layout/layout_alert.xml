@@ -6,7 +6,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:paddingHorizontal="@dimen/peeker_margin_horizontal"
-    android:background="@android:color/transparent">
+    android:background="@android:color/transparent"
+    android:layout_gravity="center_horizontal">
 
     <androidx.cardview.widget.CardView
         android:id="@+id/card_background"
@@ -87,9 +88,9 @@
                     android:layout_height="wrap_content"
                     android:id="@+id/action_text"
                     android:textSize="14sp"
-                    android:text="확인"
                     android:layout_marginHorizontal="6dp"
-                    android:layout_marginVertical="4dp"/>
+                    android:layout_marginVertical="4dp"
+                    tools:text="Action"/>
 
             </androidx.cardview.widget.CardView>
 
