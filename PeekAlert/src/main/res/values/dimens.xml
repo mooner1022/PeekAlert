@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="peeker_padding_default">10dp</dimen>
+    <dimen name="peeker_radius_default">22dp</dimen>
+    <dimen name="peeker_margin_horizontal">12dp</dimen>
+</resources>
