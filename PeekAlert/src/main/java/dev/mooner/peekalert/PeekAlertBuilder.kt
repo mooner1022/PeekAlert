@@ -136,7 +136,7 @@ class PeekAlertBuilder(
         alert.setWidth(width)
         paddingPx?.let(alert::setPaddingPx) ?: paddingDp?.let(alert::setPaddingDp)
         alert.setMargin(margin.first, margin.second)
-        iconRes?.let(alert::setIcon)
+        alert.setIcon(iconRes)
         iconTint?.let { alert.setIconTint(color = it) }
         alert.setDraggable(draggable)
         alert.setHideOnTouch(hideOnTouch)

@@ -15,6 +15,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.animation.doOnEnd
 import androidx.core.view.*
 import dev.mooner.peekalert.databinding.LayoutAlertBinding
+import dev.mooner.peekalert.utils.dp
 
 
 class PeekAlertView(
@@ -50,11 +51,22 @@ class PeekAlertView(
         }
     }
 
-    fun setIcon(@DrawableRes res: Int, @ColorInt tint: Int?) {
+    fun setIcon(@DrawableRes res: Int?, @ColorInt tint: Int?) {
         binding.icon.apply {
-            setImageResource(res)
-            if (tint != null) {
-                imageTintList = ColorStateList.valueOf(tint)
+            if (res != null) {
+                visibility = VISIBLE
+                updateLayoutParams {
+                    width = WRAP_CONTENT
+                }
+                setImageResource(res)
+                if (tint != null) {
+                    imageTintList = ColorStateList.valueOf(tint)
+                }
+            } else {
+                visibility = INVISIBLE
+                updateLayoutParams {
+                    width = 16.dp
+                }
             }
         }
     }

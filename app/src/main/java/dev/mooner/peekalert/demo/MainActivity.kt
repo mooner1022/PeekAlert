@@ -37,7 +37,7 @@ class MainActivity : AppCompatActivity() {
                 cornerRadius = 12.dp.toFloat()
                 paddingDp = 14
                 width = LayoutParams.MATCH_PARENT
-                iconRes = dev.mooner.peekalert.R.drawable.round_info_24
+                iconRes = null
                 draggable = true
                 hideOnTouch = true
                 iconTint(android.R.color.white)

@@ -37,7 +37,7 @@ class PeekAlert internal constructor(
     private var margin     : Pair<Int?, Int?> = Pair(null, null)
     private val titleConfig: TextConfig by lazy { TextConfig() }
     private val textConfig : TextConfig by lazy { TextConfig() }
-    private var iconRes    : Int? = null
+    private var iconRes    : Int? = R.drawable.round_info_24
     private var iconTint   : Int? = null
     private var draggable  : Boolean = false
     private var hideOnTouch: Boolean = false
@@ -107,7 +107,7 @@ class PeekAlert internal constructor(
         return this
     }
 
-    fun setIcon(@DrawableRes res: Int): PeekAlert {
+    fun setIcon(@DrawableRes res: Int?): PeekAlert {
         this.iconRes = res
         return this
     }
@@ -227,8 +227,7 @@ class PeekAlert internal constructor(
         if (textConfig.content != null)
             peek.setText(textConfig)
 
-        if (iconRes != null)
-            peek.setIcon(iconRes!!, iconTint)
+        peek.setIcon(iconRes, iconTint)
 
         if (actionConfig.text != null)
             peek.setAction(actionConfig)
