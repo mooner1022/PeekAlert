@@ -168,7 +168,7 @@ class PeekAlert internal constructor(
 
     @JvmOverloads
     fun setAction(
-        text: String,
+        text: String?,
         @ColorRes
         backgroundColorRes: Int? = null,
         @ColorInt
@@ -330,15 +330,18 @@ class PeekAlert internal constructor(
 
     companion object {
 
+        @JvmStatic
         fun create(view: ViewGroup): PeekAlert =
             PeekAlert(view, false)
 
+        @JvmStatic
         fun create(activity: Activity): PeekAlert =
             PeekAlert(
                 activity.window.decorView as ViewGroup,
                 activity.isInMultiWindowMode
             )
 
+        @JvmStatic
         fun create(fragment: Fragment): PeekAlert =
             create(fragment.requireActivity())
     }
