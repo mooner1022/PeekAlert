@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.library'
     id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.dokka'
 }
 
 android {
@@ -29,6 +30,20 @@ android {
     }
     kotlinOptions {
         jvmTarget = '1.8'
+    }
+}
+
+dokkaHtml {
+    dokkaSourceSets {
+        outputDirectory.set(new File("$buildDir/dokka"))
+
+        named("main") {
+            sourceLink {
+                path = "src/main/java"
+                lineSuffix = "#L"
+            }
+            noAndroidSdkLink.set(false)
+        }
     }
 }
 
