@@ -1,4 +1,4 @@
-# <h1 align="center"><img src="./arts/logo.svg" style="width:100px;height:100px;"/><br>PeekAlert</h1>
+# <h1 align="center"><img src="./arts/logo.svg" style="width:140px;height:100px;"/><br>PeekAlert</h1>
 
 <p align="center">
 A Lightweight and Highly-customizable alert library
@@ -91,5 +91,8 @@ createPeekAlert(this) {
 
 Custom
 ```kotlin
-
+To be documented...
 ```
+
+### Get more info at docs
+[Dokka Docs](https://profile.mooner.dev/PeekAlert)
