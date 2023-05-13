@@ -34,6 +34,16 @@ android {
 }
 
 dokkaHtml {
+    moduleName.set("PeekAlert")
+
+    pluginsMapConfiguration.set(
+            [
+                    "org.jetbrains.dokka.base.DokkaBase": """{
+                        "footerMessage": "made by <a href=\\\"https://github.com/mooner1022\\\">@mooner1022</a> with <span style=\\\"color: orange;\\\">❤</span> and ☕"
+                      }"""
+            ]
+    )
+
     dokkaSourceSets {
         outputDirectory.set(new File("$buildDir/dokka"))
 
