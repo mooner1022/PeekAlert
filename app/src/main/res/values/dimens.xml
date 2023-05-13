@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <dimen name="layout_padding">20dp</dimen>
-    <dimen name="card_radius">10dp</dimen>
-    <dimen name="config_desc_fontsize">16sp</dimen>
-    <dimen name="config_desc_padding">8dp</dimen>
-    <dimen name="config_subtext_fontsize">14sp</dimen>
-    <dimen name="config_item_margin">8dp</dimen>
-</resources>
