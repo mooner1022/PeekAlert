@@ -3,12 +3,11 @@ package dev.mooner.peekalert.demo
 import android.annotation.SuppressLint
 import android.content.res.Resources
 import android.graphics.Color
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.ViewGroup.LayoutParams
 import android.widget.Toast
-import androidx.annotation.ColorInt
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.widget.addTextChangedListener
 import com.skydoves.colorpickerview.ColorEnvelope
