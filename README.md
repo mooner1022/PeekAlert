@@ -95,4 +95,4 @@ To be documented...
 ```
 
 ### Get more info at docs
-[Dokka Docs](https://profile.mooner.dev/PeekAlert)
+[Dokka Docs](https://profile.mooner.dev/PeekAlert/-peek-alert/dev.mooner.peekalert/-peek-alert/index.html)
