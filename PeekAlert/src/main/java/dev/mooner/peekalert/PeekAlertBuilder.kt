@@ -1,9 +1,11 @@
 package dev.mooner.peekalert
 
 import android.app.Activity
+import android.app.Dialog
 import android.content.Context
 import android.graphics.Typeface
 import android.view.ViewGroup
+import android.view.Window
 import androidx.annotation.ColorInt
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
@@ -36,7 +38,19 @@ class PeekAlertBuilder(
     var draggable   : Boolean = false
     var hideOnTouch : Boolean = false
     var autoHideMillis : Long? = null
+    /** How high the alert is above what is behind it, in dp, which is how large a shadow it casts; none by default. */
+    var elevationDp : Float? = null
+    /** The icon's width and height in dp; the size of its drawable by default. */
+    var iconSizeDp  : Int? = null
     private var bgColor: Int? = null
+    private var strokeColor: Int? = null
+    private var strokeWidthDp: Float = 1f
+    private var onDismiss: PeekDismissListener? = null
+
+    /** Called each time the alert has left the screen. */
+    fun onDismiss(listener: PeekDismissListener) {
+        onDismiss = listener
+    }
 
     fun backgroundColor(@ColorRes res: Int? = null, @ColorInt value: Int? = null) {
         bgColor = res?.let(parentView.context::getColor) ?: value
@@ -44,6 +58,12 @@ class PeekAlertBuilder(
 
     fun iconTint(@ColorRes res: Int? = null, @ColorInt value: Int? = null) {
         iconTint = res?.let(parentView.context::getColor) ?: value
+    }
+
+    /** A line around the alert, which sets it apart from what is behind it where their colors are close. */
+    fun stroke(@ColorRes res: Int? = null, @ColorInt value: Int? = null, widthDp: Float = 1f) {
+        strokeColor = res?.let(parentView.context::getColor) ?: value
+        strokeWidthDp = widthDp
     }
 
     @InnerBuilderDsl
@@ -71,6 +91,8 @@ class PeekAlertBuilder(
     ) {
         var textSize  : Float? = null
         var typeface  : Typeface? = null
+        /** The most lines shown before the title is cut with an ellipsis; one by default. */
+        var maxLines  : Int? = null
         private var textColor: Int? = null
 
         fun textColor(@ColorRes res: Int? = null, @ColorInt value: Int? = null) {
@@ -82,6 +104,7 @@ class PeekAlertBuilder(
             textSize?.let(peekAlert::setTitleSize)
             textColor?.let { peekAlert.setTitleColor(color = it) }
             typeface?.let(peekAlert::setTitleTypeface)
+            maxLines?.let(peekAlert::setTitleMaxLines)
         }
     }
 
@@ -91,6 +114,8 @@ class PeekAlertBuilder(
     ) {
         var textSize  : Float? = null
         var typeface  : Typeface? = null
+        /** The most lines shown before the text is cut with an ellipsis; four by default. */
+        var maxLines  : Int? = null
         private var textColor: Int? = null
 
         fun textColor(@ColorRes res: Int? = null, @ColorInt value: Int? = null) {
@@ -102,6 +127,7 @@ class PeekAlertBuilder(
             textSize?.let(peekAlert::setTextSize)
             textColor?.let { peekAlert.setTextColor(color = it) }
             typeface?.let(peekAlert::setTextTypeface)
+            maxLines?.let(peekAlert::setTextMaxLines)
         }
     }
 
@@ -109,6 +135,9 @@ class PeekAlertBuilder(
         private val text: String,
         private val context: Context,
     ) {
+        /** The size of the button's text in sp. */
+        var textSize  : Float? = null
+        var typeface  : Typeface? = null
         private var backgroundColor : Int? = null
         private var textColor       : Int? = null
         private var onActionListener: PeekActionListener? = null
@@ -126,7 +155,7 @@ class PeekAlertBuilder(
         }
 
         internal fun build(peekAlert: PeekAlert) {
-            peekAlert.setAction(ActionConfig(text, backgroundColor, textColor, onActionListener))
+            peekAlert.setAction(ActionConfig(text, backgroundColor, textColor, onActionListener, textSize, typeface))
         }
     }
 
@@ -142,6 +171,10 @@ class PeekAlertBuilder(
         alert.setHideOnTouch(hideOnTouch)
         autoHideMillis?.let(alert::setAutoHide)
         bgColor?.let { alert.setBackgroundColor(color = it) }
+        strokeColor?.let { alert.setStroke(color = it, widthDp = strokeWidthDp) }
+        elevationDp?.let(alert::setElevationDp)
+        iconSizeDp?.let(alert::setIconSizeDp)
+        onDismiss?.let(alert::setOnDismissListener)
         return alert
     }
 }
@@ -157,6 +190,16 @@ fun createPeekAlert(activity: Activity, block: BuilderBlock) =
 @JvmSynthetic
 fun createPeekAlert(fragment: Fragment, block: BuilderBlock) =
     createBuilder(fragment, block).build()
+
+/** An alert shown in [window], such as a dialog's: one shown in the activity would be behind the dialog. */
+@JvmSynthetic
+fun createPeekAlert(window: Window, block: BuilderBlock) =
+    createBuilder(window.decorView as ViewGroup, block).build()
+
+/** An alert shown over [dialog], which must have been created or shown, so that it has a window. */
+@JvmSynthetic
+fun createPeekAlert(dialog: Dialog, block: BuilderBlock) =
+    createPeekAlert(requireNotNull(dialog.window) { "The dialog has no window" }, block)
 
 private fun createBuilder(
     parentView: Any,

@@ -89,10 +89,74 @@ createPeekAlert(this) {
 }.peek()
 ```
 
-Custom
+#### Several alerts at once
+
+Alerts are independent: showing or hiding one leaves the others as they are. Alerts shown at the same position of
+the same window form a deck. The newest is in front at its full size, and the older ones are tucked behind it, a
+little smaller, with only their edge showing, so a burst of alerts takes about the room of one. A tap on a deck of
+more than one spreads it out for a few seconds, each alert in full, to be read or swiped away; then it folds back.
+
 ```kotlin
-To be documented...
+// At most this many in a deck; one more makes the oldest leave. 3 by default.
+PeekAlert.maxVisible = 3
 ```
+
+#### Where an alert is shown
+
+An alert keeps clear of the status bar, the navigation bar, a display cutout and the keyboard by itself, whether or
+not the window draws edge to edge.
+
+```kotlin
+PeekAlert.create(activity)   // over the activity
+PeekAlert.create(fragment)   // over the fragment's activity
+PeekAlert.create(dialog)     // over a dialog, such as a bottom sheet; one shown in the activity would be behind it
+PeekAlert.create(viewGroup)  // inside a view: a FrameLayout, CoordinatorLayout, ConstraintLayout or RelativeLayout
+```
+
+#### More
+
+```kotlin
+createPeekAlert(this) {
+    position = PeekAlert.Position.Top
+    autoHideMillis = 3000L   // made longer where the user asked for more time, in the accessibility settings
+    draggable = true         // swipe it toward its edge to dismiss it
+    hideOnTouch = false      // or let a tap dismiss it
+    text("Saved") {
+        maxLines = 4         // the text is cut with an ellipsis past this; 4 by default, 1 for the title
+    }
+    action("Undo") {
+        setOnActionListener { /* ... */ }
+    }
+    onDismiss { /* the alert left the screen, however it did */ }
+}.peek()
+```
+
+`peek()` and `hide()` can be called from any thread. `isShowing` tells whether the alert is on screen.
+
+`setMargin` takes dp.
+
+#### How the card looks
+
+```kotlin
+createPeekAlert(this) {
+    backgroundColor(value = Color.WHITE)
+    stroke(res = R.color.outline)   // a line around the card, 1dp wide unless widthDp says otherwise
+    elevationDp = 6f                // a shadow under the card; only the alert in front of a deck casts one
+    cornerRadius = 14 * density     // px
+    paddingDp = 12
+    iconSizeDp = 20                 // the size of the icon's drawable by default
+    title("Couldn't save") { /* textColor, textSize, typeface, maxLines */ }
+    text("The disk is full.")
+    action("Details") {
+        // With no colors or typeface of its own, the button takes those of the title (of the text where there is
+        // no title) and is on a faint wash of that color, so it goes with whatever the card looks like.
+        setOnActionListener { /* ... */ }
+    }
+}.peek()
+```
+
+An alert has no line and no shadow unless it is given them: where the card's color is close to what is behind it,
+they are what sets it apart.
 
 ### Get more info at docs
 [Dokka Docs](https://profile.mooner.dev/PeekAlert/-peek-alert/dev.mooner.peekalert/-peek-alert/index.html)

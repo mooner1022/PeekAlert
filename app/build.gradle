@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace 'dev.mooner.peekalert.demo'
-    compileSdk 33
+    compileSdk 36
 
     defaultConfig {
         applicationId "dev.mooner.peekalert.demo"
         minSdk 24
-        targetSdk 33
+        targetSdk 36
         versionCode 1
         versionName "1.0"
     }
@@ -28,8 +28,11 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-    kotlinOptions {
-        jvmTarget = '1.8'
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8
     }
 }
 

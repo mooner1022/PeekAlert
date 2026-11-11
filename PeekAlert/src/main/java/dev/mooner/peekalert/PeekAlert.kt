@@ -9,33 +9,55 @@
 package dev.mooner.peekalert
 
 import android.app.Activity
+import android.app.Dialog
+import android.content.Context
 import android.graphics.Typeface
-import android.view.Gravity
+import android.os.Build
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-import android.view.animation.AnimationUtils
-import android.widget.FrameLayout
+import android.view.Window
+import android.view.accessibility.AccessibilityManager
 import androidx.annotation.ColorInt
 import androidx.annotation.ColorRes
 import androidx.annotation.Dimension
 import androidx.annotation.DrawableRes
 import androidx.annotation.Px
-import androidx.core.view.postDelayed
 import androidx.fragment.app.Fragment
-import dev.mooner.peekalert.interpolator.CubicBezierInterpolator
 import dev.mooner.peekalert.utils.dp
-import dev.mooner.peekalert.utils.getStatusBarHeight
-import dev.mooner.peekalert.utils.setOnAnimationEndListener
-import java.lang.ref.WeakReference
+import dev.mooner.peekalert.utils.mainHandler
+import dev.mooner.peekalert.utils.onMainThread
 
 typealias PeekActionListener = (view: View) -> Unit
 
+/** Called when an alert left the screen, however it did: by itself, by a swipe or a tap, by [PeekAlert.hide]. */
+typealias PeekDismissListener = () -> Unit
+
+/**
+ * An alert that slides in at the top or the bottom of a window, or of a view, and leaves by itself, by a swipe or
+ * when asked to.
+ *
+ * Several can be shown at once. At the same position they form a deck: the newest in front, the older ones tucked
+ * behind it with their edges showing, up to [maxVisible]; a tap spreads the deck out for a while so each can be read.
+ * Each alert is its own: showing or hiding one leaves the others as they are. An alert keeps clear of the status
+ * bar, the navigation bar, a display cutout and the keyboard.
+ *
+ * [peek] and [hide] may be called from any thread.
+ */
 class PeekAlert internal constructor(
     private val parentView: ViewGroup,
-    private val isMultiWindow: Boolean
+    // The top inset used to be skipped in multi-window mode; where the alert goes is now measured, see PeekAlertHost.
+    @Suppress("unused") private val isMultiWindow: Boolean
 ) {
+    private enum class State { IDLE, SHOWING, HIDING }
+
+    private var state: State = State.IDLE
+    /** The view on screen while the alert is showing or leaving. */
     private var instance: PeekAlertView? = null
+    /** Its deck is spread out for the user to read: the alert stays until the deck folds back. */
+    private var paused = false
+    private val autoHide = Runnable(::hide)
+    private var onDismiss: PeekDismissListener? = null
 
     private var position   : Position = Position.Bottom
     private var radius     : Float? = null
@@ -51,6 +73,10 @@ class PeekAlert internal constructor(
     private var hideOnTouch: Boolean = false
     private var autoHideMillis: Long? = null
     private val actionConfig  : ActionConfig by lazy { ActionConfig() }
+    private var strokeColor   : Int? = null
+    private var strokeWidthDp : Float = 1f
+    private var elevationDp   : Float? = null
+    private var iconSizeDp    : Int? = null
 
     /**
      * Set the position of alert to be shown
@@ -70,6 +96,30 @@ class PeekAlert internal constructor(
     @JvmOverloads
     fun setBackgroundColor(@ColorRes res: Int? = null, @ColorInt color: Int? = null): PeekAlert {
         this.bgColor = res?.let(parentView.context::getColor) ?: color
+        return this
+    }
+
+    /**
+     * Set a line around the alert, which sets it apart from what is behind it where their colors are close.
+     * With neither [res] nor [color], the alert has no line.
+     * @param res : Color resource
+     * @param color : Color int
+     * @param widthDp : How wide the line is, in dp
+     */
+    @JvmOverloads
+    fun setStroke(@ColorRes res: Int? = null, @ColorInt color: Int? = null, widthDp: Float = 1f): PeekAlert {
+        this.strokeColor = res?.let(parentView.context::getColor) ?: color
+        this.strokeWidthDp = widthDp
+        return this
+    }
+
+    /**
+     * Set how high the alert is above what is behind it, which is how large a shadow it casts; none by default.
+     * Only the alert in front of a deck casts its shadow.
+     * @param dp : The elevation in dp
+     */
+    fun setElevationDp(@Dimension(unit = Dimension.DP) dp: Float): PeekAlert {
+        this.elevationDp = dp
         return this
     }
 
@@ -94,9 +144,9 @@ class PeekAlert internal constructor(
 
     /**
      * Set title of alert
-     * @param title : The desired content of title text
+     * @param title : The desired content of title text, or null for an alert with no title
      */
-    fun setTitle(title: String): PeekAlert {
+    fun setTitle(title: String?): PeekAlert {
         titleConfig.content = title
         return this
     }
@@ -189,6 +239,15 @@ class PeekAlert internal constructor(
     }
 
     /**
+     * Set the width and height of the icon
+     * @param dp : The size in dp, or null for the size of the icon's drawable
+     */
+    fun setIconSizeDp(@Dimension(unit = Dimension.DP) dp: Int?): PeekAlert {
+        this.iconSizeDp = dp
+        return this
+    }
+
+    /**
      * Set padding of alert, in px
      * @param px : The desired padding in px
      */
@@ -206,14 +265,38 @@ class PeekAlert internal constructor(
 
     /**
      * Set horizontal, vertical margin of alert
-     * @param horizontal : The desired horizontal margin of alert, in px
-     * @param vertical : The desired vertical margin of alert, in px
+     * @param horizontal : The space kept at each side of the alert, in dp
+     * @param vertical : The space kept from the edge of the screen the alert is shown at, in dp
      */
     fun setMargin(
         @Dimension(unit = Dimension.DP) horizontal: Int? = null,
         @Dimension(unit = Dimension.DP) vertical: Int? = null
     ): PeekAlert {
         margin = Pair(horizontal ?: margin.first, vertical ?: margin.second)
+        return this
+    }
+
+    /**
+     * Set the most lines of the title shown before it is cut with an ellipsis; one by default
+     */
+    fun setTitleMaxLines(maxLines: Int): PeekAlert {
+        titleConfig.maxLines = maxLines
+        return this
+    }
+
+    /**
+     * Set the most lines of the text shown before it is cut with an ellipsis; four by default
+     */
+    fun setTextMaxLines(maxLines: Int): PeekAlert {
+        textConfig.maxLines = maxLines
+        return this
+    }
+
+    /**
+     * Set a listener called each time the alert has left the screen, or null for none
+     */
+    fun setOnDismissListener(listener: PeekDismissListener?): PeekAlert {
+        onDismiss = listener
         return this
     }
 
@@ -266,6 +349,8 @@ class PeekAlert internal constructor(
         actionConfig.backgroundColor  = config.backgroundColor
         actionConfig.textColor        = config.textColor
         actionConfig.onActionListener = config.onActionListener
+        actionConfig.textSize         = config.textSize
+        actionConfig.typeface         = config.typeface
         return this
     }
 
@@ -306,143 +391,172 @@ class PeekAlert internal constructor(
         return this
     }
 
+    /** Whether the alert is on screen and not on its way out. */
+    val isShowing: Boolean
+        get() = state == State.SHOWING
+
     /**
-     * Show the alert on screen, with settings set before
+     * Show the alert on screen, with settings set before. One that is showing already is shown anew, in place of
+     * itself; other alerts stay.
      * @see hide
      */
-    fun peek() {
-        removeViewFromParent()
-
-        val context = parentView.context
-        val peek = PeekAlertView(context, width).apply {
-            id = getIdByPosition()
-        }
-
-        val (marginHoriz, marginVert) = margin
-        val padding = marginVert ?: 16.dp
-        val (padTop, padBottom) = run {
-            var top    = 0
-            var bottom = 0
-            when(position) {
-                Position.Top -> {
-                    top = if (!isMultiWindow)
-                        padding + getStatusBarHeight(parentView)
-                    else
-                        padding
-                }
-                Position.Bottom -> {
-                    bottom = padding
-                }
-            }
-            top to bottom
-        }
-        peek.setPadding(0, padTop, 0, padBottom)
-
-        if (titleConfig.content != null)
-            peek.setTitle(titleConfig)
-
-        if (textConfig.content != null)
-            peek.setText(textConfig)
-
-        peek.setIcon(iconRes, iconTint)
-
-        if (actionConfig.text != null)
-            peek.setAction(actionConfig)
-
-        peek.setDraggable(draggable, position)
-
-        radius?.let(peek::setRadius)
-
-        bgColor?.let(peek::setBackgroundColor)
-
-        paddingPx?.let(peek::setPadding)
-
-        marginHoriz?.let(peek::setMargin)
-
-        if (position == Position.Bottom) {
-            val rootView = parentView.findViewById<FrameLayout>(android.R.id.content)
-            val params = FrameLayout.LayoutParams(width, WRAP_CONTENT).apply {
-                gravity = Gravity.CENTER or Gravity.BOTTOM
-            }
-            rootView.addView(peek, params)
-        } else {
-            parentView.addView(peek)
-        }
-
-        AnimationUtils.loadAnimation(context, getAnimationByPosition(true))
-            .apply {
-                interpolator = CubicBezierInterpolator(0.0, 0.0, 0.05, 1.0)
-                duration = 300
-            }
-            .let(peek::startAnimation)
-
-        instance = peek
-        if (autoHideMillis != null) {
-            peek.postDelayed(autoHideMillis!!) {
-                hide(peek)
-            }
-        }
-        if (hideOnTouch) {
-            peek.setOnClickListener {
-                println("click")
-                hide(peek)
-            }
-        }
-    }
+    fun peek() = onMainThread(::show)
 
     /**
-     * Hide the alert currently being shown on the screen if present
+     * Hide the alert if it is being shown
      * @see peek
      */
-    fun hide() {
-        if (instance != null)
-            hide(instance!!)
-    }
+    fun hide() = onMainThread(::leave)
 
-    private fun hide(view: ViewGroup) {
-        AnimationUtils.loadAnimation(view.context, getAnimationByPosition(false))
-            .apply {
-                interpolator = CubicBezierInterpolator(0.05, 1.0, 1.0, 1.0)
-                setOnAnimationEndListener {
-                    removeViewFromParent()
-                    instance = null
-                }
+    private fun show() {
+        // Shown anew in its own place. If it was on its way out, that is where it has now got to.
+        instance?.let { detach(it, notify = state == State.HIDING) }
+
+        val context = parentView.context
+        val view = PeekAlertView(context, width)
+        configure(view)
+        val host = PeekAlertHost.obtain(parentView, position)
+
+        view.owner = this
+        view.onDismissRequest = ::leave
+        view.onSettle = { host.settle(view) }
+        // A tap hides an alert set to hide on touch; otherwise it spreads out a deck of several, or folds it back.
+        view.onTap = {
+            if (hideOnTouch)
+                leave()
+            else
+                host.toggleExpanded()
+        }
+        // The alert doesn't leave from under a finger: its time starts over when the finger lifts.
+        view.onTouchingChanged = { touching ->
+            host.touched()
+            mainHandler.removeCallbacks(autoHide)
+            if (!touching && state == State.SHOWING)
+                scheduleAutoHide()
+        }
+        // The window went away with the alert in it: nothing is left to hide.
+        view.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) {}
+
+            override fun onViewDetachedFromWindow(v: View) {
+                if (instance === view)
+                    forget()
             }
-            .let(view::startAnimation)
+        })
+
+        instance = view
+        state = State.SHOWING
+        paused = host.isExpanded
+        val overflow = host.add(view, maxVisible)
+        scheduleAutoHide()
+
+        for (alert in overflow)
+            if (alert !== this)
+                alert.leave()
     }
 
-    private fun removeViewFromParent() {
-        getParent()?.let { parent ->
-            val id = getIdByPosition()
-            parent.findViewById<ViewGroup>(id)?.let {
-                parent.removeView(it)
-            }
-        }
+    private fun configure(view: PeekAlertView) {
+        val context = parentView.context
+        val (marginHoriz, marginVert) = margin
+
+        marginVert?.let { view.edgeMargin = it.dp }
+
+        if (titleConfig.content != null)
+            view.setTitle(titleConfig)
+
+        if (textConfig.content != null)
+            view.setText(textConfig)
+
+        paddingPx?.let(view::setPadding)
+
+        view.setIconSize(iconSizeDp?.dp)
+        view.setIcon(iconRes, iconTint)
+
+        if (actionConfig.text != null)
+            view.setAction(actionConfig)
+
+        view.setDraggable(draggable, position)
+
+        radius?.let(view::setRadius)
+
+        bgColor?.let(view::setBackgroundColor)
+
+        val density = context.resources.displayMetrics.density
+        view.setStroke(strokeColor, (strokeWidthDp * density).toInt().coerceAtLeast(1))
+        elevationDp?.let { view.setCardElevation(it * density) }
+
+        marginHoriz?.let { view.setMargin(it.dp) }
     }
 
-    private fun getParent(): ViewGroup? =
-        when(position) {
-            Position.Top ->
-                parentView
-            Position.Bottom ->
-                parentView.findViewById(android.R.id.content)
-        }
+    /** Holds the alert's time to leave by itself, while its deck is spread out, or lets it start over. */
+    internal fun setPaused(paused: Boolean) {
+        this.paused = paused
+        if (paused)
+            mainHandler.removeCallbacks(autoHide)
+        else if (state == State.SHOWING)
+            scheduleAutoHide()
+    }
 
-    private fun getAnimationByPosition(show: Boolean) =
-        when(position) {
-            Position.Top ->
-                if (show) R.anim.top_show else R.anim.top_hide
-            Position.Bottom ->
-                if (show) R.anim.bottom_show else R.anim.bottom_hide
-        }
+    private fun scheduleAutoHide() {
+        mainHandler.removeCallbacks(autoHide)
+        val millis = autoHideMillis ?: return
+        if (paused)
+            return
+        mainHandler.postDelayed(autoHide, readableTimeout(parentView.context, millis))
+    }
 
-    private fun getIdByPosition() =
-        when(position) {
-            Position.Top ->
-                R.id.id_alert_view_top
-            Position.Bottom ->
-                R.id.id_alert_view_bottom
+    /** [millis], or longer where the user asked for more time to read and act, in the system's accessibility settings. */
+    private fun readableTimeout(context: Context, millis: Long): Long {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
+            return millis
+        val manager = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
+            ?: return millis
+        var flags = AccessibilityManager.FLAG_CONTENT_ICONS or AccessibilityManager.FLAG_CONTENT_TEXT
+        if (actionConfig.text != null)
+            flags = flags or AccessibilityManager.FLAG_CONTENT_CONTROLS
+        return manager.getRecommendedTimeoutMillis(millis.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), flags).toLong()
+    }
+
+    private fun leave() {
+        val view = instance ?: return
+        if (state != State.SHOWING)
+            return
+        state = State.HIDING
+        mainHandler.removeCallbacks(autoHide)
+        val host = view.parent as? PeekAlertHost
+        if (host == null) {
+            detach(view, notify = true)
+            return
         }
+        host.dismiss(view) { finish(view, notify = true) }
+    }
+
+    /** Takes [view] off the screen at once. */
+    private fun detach(view: PeekAlertView, notify: Boolean) {
+        (view.parent as? PeekAlertHost)?.remove(view)
+            ?: (view.parent as? ViewGroup)?.removeView(view)
+        finish(view, notify)
+    }
+
+    /** [view] is out of the view tree. */
+    private fun finish(view: PeekAlertView, notify: Boolean) {
+        view.onDismissRequest = null
+        view.onSettle = null
+        view.onTap = null
+        view.onTouchingChanged = null
+        view.owner = null
+        if (instance === view)
+            forget()
+        if (notify)
+            onDismiss?.invoke()
+    }
+
+    private fun forget() {
+        mainHandler.removeCallbacks(autoHide)
+        instance = null
+        state = State.IDLE
+        paused = false
+    }
 
     sealed class Position {
         object Top   : Position()
@@ -451,6 +565,18 @@ class PeekAlert internal constructor(
 
     companion object {
 
+        /**
+         * The most alerts in the deck at one position of one window or view. One more makes the oldest leave. At
+         * least 1.
+         */
+        @JvmStatic
+        @Volatile
+        var maxVisible: Int = 3
+
+        /**
+         * An alert shown in [view]. A `FrameLayout`, `CoordinatorLayout`, `ConstraintLayout` or `RelativeLayout` can
+         * hold it at its top or bottom; in another kind of group it goes where that group puts a new child.
+         */
         @JvmStatic
         fun create(view: ViewGroup): PeekAlert =
             PeekAlert(view, false)
@@ -465,5 +591,15 @@ class PeekAlert internal constructor(
         @JvmStatic
         fun create(fragment: Fragment): PeekAlert =
             create(fragment.requireActivity())
+
+        /** An alert shown in [window], such as a dialog's: one shown in the activity would be behind the dialog. */
+        @JvmStatic
+        fun create(window: Window): PeekAlert =
+            PeekAlert(window.decorView as ViewGroup, false)
+
+        /** An alert shown over [dialog], which must have been created or shown, so that it has a window. */
+        @JvmStatic
+        fun create(dialog: Dialog): PeekAlert =
+            create(requireNotNull(dialog.window) { "The dialog has no window" })
     }
 }
