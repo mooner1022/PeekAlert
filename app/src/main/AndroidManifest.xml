@@ -21,6 +21,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- Exported so that the cases can be started from adb; see BenchActivity. -->
+        <activity
+                android:name=".BenchActivity"
+                android:exported="true"
+                android:windowSoftInputMode="adjustResize" />
     </application>
 
 </manifest>
