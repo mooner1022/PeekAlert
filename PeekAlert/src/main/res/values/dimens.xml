@@ -3,4 +3,13 @@
     <dimen name="peeker_padding_default">10dp</dimen>
     <dimen name="peeker_radius_default">22dp</dimen>
     <dimen name="peeker_margin_horizontal">12dp</dimen>
+    <!-- Between an alert and the edge of the screen (below the status bar, above the navigation bar or keyboard). -->
+    <dimen name="peeker_margin_edge">16dp</dimen>
+    <!-- How much of each alert behind the front one shows past the one before it. -->
+    <dimen name="peeker_stack_peek">9dp</dimen>
+    <!-- Between two alerts while their deck is spread out. -->
+    <dimen name="peeker_stack_gap">8dp</dimen>
+    <!-- How far an alert that joins others slides in; the first one slides in from off the screen. -->
+    <dimen name="peeker_stack_slide">24dp</dimen>
+    <integer name="peeker_text_max_lines">4</integer>
 </resources>
